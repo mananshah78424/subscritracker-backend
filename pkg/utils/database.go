@@ -1,9 +1,9 @@
 package utils
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"fmt"
-
 	"subscritracker/config"
 
 	"github.com/uptrace/bun"
@@ -18,6 +18,12 @@ func NewDatabase() (*bun.DB, error) {
 		pgdriver.WithDatabase(databaseCfg.DBName),
 		pgdriver.WithUser(databaseCfg.User),
 		pgdriver.WithPassword(databaseCfg.Password),
+	}
+
+	if databaseCfg.SSLMode {
+		opts = append(opts, pgdriver.WithTLSConfig(&tls.Config{ServerName: databaseCfg.Host}))
+	} else {
+		opts = append(opts, pgdriver.WithInsecure(true))
 	}
 
 	pgconn := pgdriver.NewConnector(opts...)
