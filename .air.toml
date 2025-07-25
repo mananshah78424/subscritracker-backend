@@ -1,0 +1,22 @@
+# .air.toml
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "chamber exec app-aws -- go build -o ./tmp/main ./cmd/server"
+  bin = "./scripts/run_with_chamber.sh"
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  exclude_dir = ["tmp", "vendor"]
+  exclude_file = []
+  follow_symlink = false
+  dir = "."
+  log = "build-errors.log"
+
+[log]
+  time = true
+
+[color]
+  main = "yellow"
+  watcher = "cyan"
+  build = "green"
+  runner = "magenta"
