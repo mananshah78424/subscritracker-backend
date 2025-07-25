@@ -6,7 +6,14 @@ import (
 )
 
 type Config struct {
-	Database DatabaseConfig
+	Database   DatabaseConfig
+	GoogleAuth GoogleAuthConfig
+}
+
+type GoogleAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
 }
 
 type DatabaseConfig struct {
