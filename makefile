@@ -22,7 +22,7 @@ db-migrate:
 db-migrate-down:
 	@echo "Running db migrations down"
 	go mod tidy
-	@go run db/migrations/main.go down\
+	@go run db/migrations/main.go down
 
 .PHONY: db-rollback
 db-rollback:

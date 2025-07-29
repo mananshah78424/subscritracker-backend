@@ -51,7 +51,18 @@ func GoogleCallBackHandler(c echo.Context) error {
 }
 
 func fetchGoogleUserInfo(accessToken string) (map[string]interface{}, error) {
-	resp, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + accessToken)
+	// Create a new request with Authorization header
+	req, err := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the Authorization header with Bearer token
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	// Make the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -69,5 +80,4 @@ func fetchGoogleUserInfo(accessToken string) (map[string]interface{}, error) {
 	}
 
 	return userInfo, nil
-
 }

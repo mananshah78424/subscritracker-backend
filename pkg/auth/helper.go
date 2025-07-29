@@ -15,11 +15,46 @@ func SaveUserToDB(c echo.Context, userInfo map[string]interface{}) error {
 	app := c.Get("app").(*application.App)
 
 	accountDetails := &models.Account{
-		GoogleID:          userInfo["id"].(string),
-		Email:             userInfo["email"].(string),
-		Name:              userInfo["name"].(string),
-		PictureURL:        userInfo["picture"].(string),
-		VerifiedEmail:     userInfo["verified_email"].(bool),
+		GoogleID: func() string {
+			id, ok := userInfo["id"].(string)
+			if !ok {
+				log.Println("Invalid type for 'id' in userInfo")
+				return ""
+			}
+			return id
+		}(),
+		Email: func() string {
+			email, ok := userInfo["email"].(string)
+			if !ok {
+				log.Println("Invalid type for 'email' in userInfo")
+				return ""
+			}
+			return email
+		}(),
+		Name: func() string {
+			name, ok := userInfo["name"].(string)
+			if !ok {
+				log.Println("Invalid type for 'name' in userInfo")
+				return ""
+			}
+			return name
+		}(),
+		PictureURL: func() string {
+			picture, ok := userInfo["picture"].(string)
+			if !ok {
+				log.Println("Invalid type for 'picture' in userInfo")
+				return ""
+			}
+			return picture
+		}(),
+		VerifiedEmail: func() bool {
+			verifiedEmail, ok := userInfo["verified_email"].(bool)
+			if !ok {
+				log.Println("Invalid type for 'verified_email' in userInfo")
+				return false
+			}
+			return verifiedEmail
+		}(),
 		Tier:              "free",
 		Status:            "active",
 		Features:          map[string]interface{}{},
