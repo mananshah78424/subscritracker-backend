@@ -11,6 +11,6 @@ func RegisterRoutes(app *application.App) {
 	app.Echo.GET("/v1/auth/google/callback", GoogleCallBackHandler)
 
 	// Protected routes (require authentication)
-	app.Echo.POST("/v1/auth/logout", LogoutHanlder, utils.AuthMiddleware)
+	app.Echo.POST("/v1/auth/logout", LogoutHandler, utils.AuthMiddleware)
 	app.Echo.GET("/v1/auth/session", CheckSessionHandler, utils.AuthMiddleware)
 }

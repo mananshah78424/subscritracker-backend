@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"subscritracker/pkg/account"
 	"subscritracker/pkg/application"
 
@@ -91,17 +90,7 @@ func fetchGoogleUserInfo(accessToken string) (map[string]interface{}, error) {
 
 // LogoutHandler logs out the user
 // Todo: Implement this
-func LogoutHanlder(c echo.Context) error {
-	authHeader := c.Request().Header.Get("Authorization")
-	if authHeader == "" {
-		return c.String(http.StatusUnauthorized, "No authorization header provided")
-	}
-
-	tokenParts := strings.Split(authHeader, " ")
-	if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid token format"})
-	}
-
+func LogoutHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "Logged out successfully",
 	})
