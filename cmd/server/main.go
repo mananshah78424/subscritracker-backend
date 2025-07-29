@@ -50,8 +50,7 @@ Register routes function
 func registerRoutes(app *application.App) error {
 	log.Println("Registering routes!")
 	app.Echo.Use(appMiddleware(app))
-	app.Echo.GET("/auth/google/login", auth.GoogleLoginHandler)
-	app.Echo.GET("/auth/google/callback", auth.GoogleCallBackHandler)
+	auth.RegisterRoutes(app)
 	account.RegisterRoutes(app)
 
 	return nil
