@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"log"
+	"subscritracker/pkg/account"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/auth"
+
+	"github.com/labstack/echo/v4"
 )
 
 /*
@@ -32,12 +35,24 @@ func main() {
 	}
 }
 
+func appMiddleware(app *application.App) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Set("app", app)
+			return next(c)
+		}
+	}
+}
+
 /*
 Register routes function
 */
 func registerRoutes(app *application.App) error {
 	log.Println("Registering routes!")
-	app.Echo.GET("/auth/google/login", auth.GoogleLoginhandler)
+	app.Echo.Use(appMiddleware(app))
+	app.Echo.GET("/auth/google/login", auth.GoogleLoginHandler)
+	app.Echo.GET("/auth/google/callback", auth.GoogleCallBackHandler)
+	account.RegisterRoutes(app)
 
 	return nil
 }
