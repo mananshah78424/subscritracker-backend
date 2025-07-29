@@ -1,7 +1,6 @@
 package account
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -15,7 +14,6 @@ import (
 func GetAccountHandler(c echo.Context) error {
 	// For now, we'll get account ID from query param
 	// Later, this will come from the authenticated user's session
-	fmt.Println("GetAccountHandler")
 	accountIDStr := c.QueryParam("id")
 	if accountIDStr == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Account ID is required"})

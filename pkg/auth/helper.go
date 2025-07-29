@@ -5,13 +5,13 @@ import (
 	"subscritracker/pkg/account"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/models"
+	"subscritracker/pkg/utils"
 	"time"
 
 	"github.com/labstack/echo/v4"
 )
 
-func SaveUserToDB(c echo.Context, userInfo map[string]interface{}) error {
-	log.Println("Saving user to database with userInfo", userInfo)
+func SaveGoogleLoggedInUserToDb(c echo.Context, userInfo map[string]interface{}) (map[string]interface{}, error) {
 	app := c.Get("app").(*application.App)
 
 	accountDetails := &models.Account{
@@ -66,9 +66,19 @@ func SaveUserToDB(c echo.Context, userInfo map[string]interface{}) error {
 
 	err := account.CreateAccount(app, accountDetails)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	// Generate JWT token
+	token, err := utils.GenerateJWT(accountDetails.ID, accountDetails.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"token":   token,
+		"user":    accountDetails,
+		"message": "Login successful",
+	}, nil
 
 }
