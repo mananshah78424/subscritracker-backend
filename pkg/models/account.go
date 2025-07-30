@@ -15,7 +15,6 @@ type Account struct {
 	GivenName         string                 `bun:"given_name" json:"given_name"`
 	FamilyName        string                 `bun:"family_name" json:"family_name"`
 	PictureURL        string                 `bun:"picture_url" json:"picture_url"`
-	VerifiedEmail     bool                   `bun:"verified_email" json:"verified_email"`
 	EmailVerified     bool                   `bun:"email_verified" json:"email_verified"`
 	PasswordHash      string                 `bun:"password_hash" json:"password_hash"`
 	VerificationToken string                 `bun:"verification_token" json:"verification_token"`

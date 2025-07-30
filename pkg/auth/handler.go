@@ -185,25 +185,13 @@ func LoginHandler(c echo.Context) error {
 
 	// Get account by email
 	accountDetails, err := account.GetAccountByEmail(app, req.Email)
-	if err != nil || accountDetails == nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Error getting account by email"})
+	if err != nil || accountDetails == nil || !accountDetails.EmailVerified || accountDetails.Status != "active" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid email or password"})
 	}
-
-	// Check if account is verified
-	if !accountDetails.EmailVerified {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Please verify your email before logging in"})
-	}
-
-	// Check if account is active
-	if accountDetails.Status != "active" {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Account is not active"})
-	}
-
 	// Verify password
 	err = bcrypt.CompareHashAndPassword([]byte(accountDetails.PasswordHash), []byte(req.Password))
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid credentials"})
-	}
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid email or password"})
 
 	// Update last login
 	accountDetails.LastLoginAt = time.Now()

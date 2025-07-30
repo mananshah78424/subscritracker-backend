@@ -47,7 +47,7 @@ func SaveGoogleLoggedInUserToDb(c echo.Context, userInfo map[string]interface{})
 			}
 			return picture
 		}(),
-		VerifiedEmail: func() bool {
+		EmailVerified: func() bool {
 			verifiedEmail, ok := userInfo["verified_email"].(bool)
 			if !ok {
 				log.Println("Invalid type for 'verified_email' in userInfo")
@@ -91,6 +91,7 @@ func CreateSignUpAccountBody(app *application.App, email string, password string
 		GivenName:         givenName,
 		FamilyName:        familyName,
 		VerificationToken: verificationToken,
+		EmailVerified:     false, // New accounts are not verified until email verification
 		Tier:              "free",
 		Status:            "active",
 		CreatedAt:         time.Now(),
