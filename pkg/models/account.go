@@ -16,6 +16,11 @@ type Account struct {
 	FamilyName        string                 `bun:"family_name" json:"family_name"`
 	PictureURL        string                 `bun:"picture_url" json:"picture_url"`
 	VerifiedEmail     bool                   `bun:"verified_email" json:"verified_email"`
+	EmailVerified     bool                   `bun:"email_verified" json:"email_verified"`
+	PasswordHash      string                 `bun:"password_hash" json:"password_hash"`
+	VerificationToken string                 `bun:"verification_token" json:"verification_token"`
+	ResetToken        string                 `bun:"reset_token" json:"reset_token"`
+	ResetTokenExpires time.Time              `bun:"reset_token_expires" json:"reset_token_expires"`
 	Tier              string                 `bun:"tier" json:"tier"`
 	Status            string                 `bun:"status" json:"status"`
 	Features          map[string]interface{} `bun:"features" json:"features"`

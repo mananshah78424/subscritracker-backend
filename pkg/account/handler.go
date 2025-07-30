@@ -61,7 +61,7 @@ func UpdateAccountHandler(c echo.Context) error {
 
 	app := c.Get("app").(*application.App)
 
-	err := UpdateAccountId(app, &account)
+	err := UpdateAccount(app, &account)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}

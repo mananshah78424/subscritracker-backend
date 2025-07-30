@@ -82,3 +82,31 @@ func SaveGoogleLoggedInUserToDb(c echo.Context, userInfo map[string]interface{})
 	}, nil
 
 }
+
+func CreateSignUpAccountBody(app *application.App, email string, password string, name string, givenName string, familyName string, verificationToken string) (*models.Account, error) {
+	accountBody := &models.Account{
+		Email:             email,
+		PasswordHash:      password,
+		Name:              name,
+		GivenName:         givenName,
+		FamilyName:        familyName,
+		VerificationToken: verificationToken,
+		Tier:              "free",
+		Status:            "active",
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+		Features:          map[string]interface{}{},
+		SubscriptionCount: 0,
+		LastLoginAt:       time.Now(),
+	}
+
+	err := account.CreateAccount(app, accountBody)
+	if err != nil {
+		log.Println("Error creating account: ", err)
+		return nil, err
+	}
+
+	// TODO: Send verification email
+	// For now, just return success
+	return accountBody, nil
+}
