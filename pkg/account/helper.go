@@ -2,6 +2,9 @@ package account
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"log"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/models"
 	"time"
@@ -45,7 +48,7 @@ func CreateAccount(app *application.App, account *models.Account) error {
 	return err
 }
 
-func UpdateAccountId(app *application.App, account *models.Account) error {
+func UpdateAccount(app *application.App, account *models.Account) error {
 	account.UpdatedAt = time.Now()
 
 	_, err := app.Database.NewUpdate().
@@ -76,4 +79,47 @@ func GetAccountStats(app *application.App, accountId int) (map[string]interface{
 	}
 
 	return stats, nil
+}
+
+// GetAccountByEmail retrieves an account by email
+func GetAccountByEmail(app *application.App, email string) (*models.Account, error) {
+	account := &models.Account{}
+
+	err := app.Database.NewSelect().
+		Model(account).
+		Where("email = ?", email).
+		Scan(context.Background())
+
+	if err != nil {
+		log.Println("Error getting account by email: ", err)
+		return nil, err
+	}
+
+	return account, nil
+}
+
+func GenerateToken() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		log.Println("Error generating token: ", err)
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+// GetAccountByVerificationToken gets account by verification token
+func GetAccountByVerificationToken(app *application.App, token string) (*models.Account, error) {
+	account := &models.Account{}
+
+	err := app.Database.NewSelect().
+		Model(account).
+		Where("verification_token = ?", token).
+		Scan(context.Background())
+
+	if err != nil {
+		log.Println("Error getting account by verification token: ", err)
+		return nil, err
+	}
+
+	return account, nil
 }

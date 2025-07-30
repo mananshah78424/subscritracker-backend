@@ -47,7 +47,7 @@ func SaveGoogleLoggedInUserToDb(c echo.Context, userInfo map[string]interface{})
 			}
 			return picture
 		}(),
-		VerifiedEmail: func() bool {
+		EmailVerified: func() bool {
 			verifiedEmail, ok := userInfo["verified_email"].(bool)
 			if !ok {
 				log.Println("Invalid type for 'verified_email' in userInfo")
@@ -81,4 +81,33 @@ func SaveGoogleLoggedInUserToDb(c echo.Context, userInfo map[string]interface{})
 		"message": "Login successful",
 	}, nil
 
+}
+
+func CreateSignUpAccountBody(app *application.App, email string, password string, name string, givenName string, familyName string, verificationToken string) (*models.Account, error) {
+	accountBody := &models.Account{
+		Email:             email,
+		PasswordHash:      password,
+		Name:              name,
+		GivenName:         givenName,
+		FamilyName:        familyName,
+		VerificationToken: verificationToken,
+		EmailVerified:     false, // New accounts are not verified until email verification
+		Tier:              "free",
+		Status:            "active",
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+		Features:          map[string]interface{}{},
+		SubscriptionCount: 0,
+		LastLoginAt:       time.Now(),
+	}
+
+	err := account.CreateAccount(app, accountBody)
+	if err != nil {
+		log.Println("Error creating account: ", err)
+		return nil, err
+	}
+
+	// TODO: Send verification email
+	// For now, just return success
+	return accountBody, nil
 }

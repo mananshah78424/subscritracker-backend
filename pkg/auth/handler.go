@@ -8,8 +8,12 @@ import (
 	"net/http"
 	"subscritracker/pkg/account"
 	"subscritracker/pkg/application"
+	"subscritracker/pkg/utils"
+	"subscritracker/pkg/validator"
+	"time"
 
 	"github.com/labstack/echo/v4"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
 )
 
@@ -108,4 +112,168 @@ func CheckSessionHandler(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, account)
+}
+
+func SignUpHandler(c echo.Context) error {
+	var req validator.SignUpRequest
+
+	// Try to bind the request
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body: " + err.Error()})
+	}
+
+	// Validate required fields
+	if err := validator.ValidateSignUp(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	app := c.Get("app").(*application.App)
+
+	// Check if email already exists
+	existingAccount, err := account.GetAccountByEmail(app, req.Email)
+	if err != nil {
+		// Check if it's a "no rows" error (which means email doesn't exist - good for signup)
+		if err.Error() == "sql: no rows in result set" {
+			// This is expected - email doesn't exist, so we can proceed with signup
+		} else {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to check if email exists"})
+		}
+	} else if existingAccount != nil {
+		// Account exists with this email
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Email already exists"})
+	}
+
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to hash password"})
+	}
+
+	// Generate verification token
+	verificationToken, err := account.GenerateToken()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to generate verification token"})
+	}
+
+	accountBody, err := CreateSignUpAccountBody(app, req.Email, string(hashedPassword), req.Name, req.GivenName, req.FamilyName, verificationToken)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create account"})
+	}
+
+	// TODO: Send verification email
+	// For now, just return success
+	return c.JSON(http.StatusCreated, map[string]interface{}{
+		"message": "Account created successfully. Please check your email to verify your account.",
+		"user_id": accountBody.ID,
+	})
+}
+
+func LoginHandler(c echo.Context) error {
+	var req validator.LoginRequest
+
+	// Try to bind the request
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body: " + err.Error()})
+	}
+
+	// Validate required fields
+	if err := validator.ValidateLogin(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	app := c.Get("app").(*application.App)
+
+	// Get account by email
+	accountDetails, err := account.GetAccountByEmail(app, req.Email)
+	if err != nil || accountDetails == nil || !accountDetails.EmailVerified || accountDetails.Status != "active" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid email or password"})
+	}
+	// Verify password
+	err = bcrypt.CompareHashAndPassword([]byte(accountDetails.PasswordHash), []byte(req.Password))
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid email or password"})
+
+	// Update last login
+	accountDetails.LastLoginAt = time.Now()
+	accountDetails.Status = "active"
+	err = account.UpdateAccount(app, accountDetails)
+	if err != nil {
+		log.Println("Failed to update last login:", err)
+	}
+
+	// Generate JWT token
+	token, err := utils.GenerateJWT(accountDetails.ID, accountDetails.Email)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to generate token"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"token":   token,
+		"user":    accountDetails,
+		"message": "Login successful",
+	})
+}
+
+// VerifyEmailHandler verifies the email of the user
+func VerifyEmailHandler(c echo.Context) error {
+	token := c.QueryParam("token")
+	if token == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Token is required"})
+	}
+
+	app := c.Get("app").(*application.App)
+	accountDetails, err := account.GetAccountByVerificationToken(app, token)
+	if err != nil || accountDetails == nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid verification token"})
+	}
+
+	accountDetails.EmailVerified = true
+	accountDetails.Status = "active"
+	accountDetails.VerificationToken = ""
+	err = account.UpdateAccount(app, accountDetails)
+	if err != nil {
+		log.Println("Failed to update account:", err)
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "Email verified successfully. You can now log in.",
+	})
+}
+
+// ForgotPasswordHandler sends a reset password email to the user
+func ForgotPasswordHandler(c echo.Context) error {
+	var req struct {
+		Email string `json:"email" validate:"required,email"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+	}
+
+	app := c.Get("app").(*application.App)
+	accountDetails, err := account.GetAccountByEmail(app, req.Email)
+	if err != nil || accountDetails == nil {
+		return c.JSON(http.StatusOK, map[string]string{
+			"message": "If an account with this email exists, a password reset link has been sent.",
+		})
+	}
+
+	// Generate reset token
+	resetToken, err := account.GenerateToken()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to generate reset token"})
+	}
+
+	// Set reset token and expiration
+	accountDetails.ResetToken = resetToken
+	accountDetails.ResetTokenExpires = time.Now().Add(time.Hour * 24)
+	err = account.UpdateAccount(app, accountDetails)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to set reset token"})
+	}
+
+	// TODO: Send password reset email
+	// For now, just return success
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "If an account with this email exists, a password reset link has been sent.",
+	})
 }
