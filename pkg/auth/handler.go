@@ -3,9 +3,12 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 	"subscritracker/pkg/account"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/utils"
@@ -27,36 +30,79 @@ func GoogleLoginHandler(c echo.Context) error {
 // GoogleCallbackHandler handles OAuth callback
 func GoogleCallBackHandler(c echo.Context) error {
 	config := GoogleOauthConfig
+	app := c.Get("app").(*application.App)
+	frontendURL := app.Config.Frontend.URL
 
 	// Get the authorization code from the query params
 	code := c.QueryParam("code")
 	if code == "" {
 		log.Println("No authorization code provided")
-		return c.String(http.StatusBadRequest, "No authorization code provided")
+		// Redirect to frontend with error
+		log.Println("Redirecting to login page with error - No authorization code provided")
+		return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 	}
 
 	// Exchange the authorization code for an access token
 	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		log.Println("Failed to exchange authorization code for access token:", err)
-		return c.String(http.StatusInternalServerError, "Failed to exchange authorization code for access token")
+		log.Println("Redirecting to login page with error %s- Failed to exchange authorization code for access token", err)
+		return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 	}
 
 	// Get the user's profile information
 	userInfo, err := fetchGoogleUserInfo(token.AccessToken)
 	if err != nil {
 		log.Println("Failed to fetch user info:", err)
-		return c.String(http.StatusInternalServerError, "Failed to fetch user info")
+		log.Println("Redirecting to login page with error %s- Failed to fetch user info", err)
+		return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 	}
 
 	userDetails, err := SaveGoogleLoggedInUserToDb(c, userInfo)
 	if err != nil {
-		log.Println("Failed to save user to DB:", err)
-		return c.String(http.StatusInternalServerError, "Failed to save user to DB")
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			// User already exists, try to get the existing user and login
+			existingUser, err := account.GetAccountByEmail(app, userInfo["email"].(string))
+			if err != nil {
+				log.Printf("Failed to get existing user: %v", err)
+				log.Println("Redirecting to login page with error %s- Failed to get existing user", err)
+				return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
+			}
+
+			// Generate JWT token for existing user
+			token, err := utils.GenerateJWT(existingUser.ID, existingUser.Email)
+			if err != nil {
+				log.Printf("Redirecting to login page with error %v- Failed to generate token for existing user", err)
+				return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
+			}
+
+			// Redirect to frontend with token and user data
+			userJSON, err := json.Marshal(existingUser)
+			if err != nil {
+				log.Println("Redirecting to login page with error %v- Failed to marshal user data", err)
+				return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
+			}
+			redirectURL := fmt.Sprintf("%s/home?token=%s&user=%s",
+				frontendURL,
+				token,
+				url.QueryEscape(string(userJSON)))
+
+			return c.Redirect(http.StatusTemporaryRedirect, redirectURL)
+		} else {
+			log.Printf("Got error here, redirecting to login page", err)
+			// Other error, send to login page without error in url
+			return c.Redirect(http.StatusTemporaryRedirect, frontendURL+"/login")
+		}
 	}
 
-	// Return the user info as JSON
-	return c.JSON(http.StatusOK, userDetails)
+	// Redirect to frontend with token and user data
+	userJSON, _ := json.Marshal(userDetails["user"])
+	redirectURL := fmt.Sprintf("%s/home?token=%s&user=%s",
+		frontendURL,
+		userDetails["token"],
+		url.QueryEscape(string(userJSON)))
+
+	return c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 }
 
 // fetchGoogleUserInfo fetches the user info from Google
@@ -192,6 +238,7 @@ func LoginHandler(c echo.Context) error {
 	err = bcrypt.CompareHashAndPassword([]byte(accountDetails.PasswordHash), []byte(req.Password))
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid email or password"})
+	}
 
 	// Update last login
 	accountDetails.LastLoginAt = time.Now()

@@ -46,7 +46,7 @@ func ValidateSignUp(req SignUpRequest) error {
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("validation failed: %s", strings.Join(errors, "; "))
+		return fmt.Errorf("signup failed: %s", strings.Join(errors, "; "))
 	}
 
 	return nil
@@ -69,7 +69,7 @@ func ValidateLogin(req LoginRequest) error {
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("validation failed: %s", strings.Join(errors, "; "))
+		return fmt.Errorf("login failed: %s", strings.Join(errors, "; "))
 	}
 
 	return nil
