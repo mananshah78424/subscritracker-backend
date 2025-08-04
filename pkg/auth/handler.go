@@ -30,6 +30,8 @@ func GoogleLoginHandler(c echo.Context) error {
 // GoogleCallbackHandler handles OAuth callback
 func GoogleCallBackHandler(c echo.Context) error {
 	config := GoogleOauthConfig
+	app := c.Get("app").(*application.App)
+	frontendURL := app.Config.Frontend.URL
 
 	// Get the authorization code from the query params
 	code := c.QueryParam("code")
@@ -37,9 +39,7 @@ func GoogleCallBackHandler(c echo.Context) error {
 		log.Println("No authorization code provided")
 		// Redirect to frontend with error
 		log.Println("Redirecting to login page with error - No authorization code provided")
-		return c.Redirect(http.StatusTemporaryRedirect,
-			"http://localhost:3000")
-
+		return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 	}
 
 	// Exchange the authorization code for an access token
@@ -47,8 +47,7 @@ func GoogleCallBackHandler(c echo.Context) error {
 	if err != nil {
 		log.Println("Failed to exchange authorization code for access token:", err)
 		log.Println("Redirecting to login page with error %s- Failed to exchange authorization code for access token", err)
-		return c.Redirect(http.StatusTemporaryRedirect,
-			"http://localhost:3000")
+		return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 	}
 
 	// Get the user's profile information
@@ -56,34 +55,35 @@ func GoogleCallBackHandler(c echo.Context) error {
 	if err != nil {
 		log.Println("Failed to fetch user info:", err)
 		log.Println("Redirecting to login page with error %s- Failed to fetch user info", err)
-		return c.Redirect(http.StatusTemporaryRedirect,
-			"http://localhost:3000")
+		return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 	}
 
 	userDetails, err := SaveGoogleLoggedInUserToDb(c, userInfo)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
 			// User already exists, try to get the existing user and login
-			app := c.Get("app").(*application.App)
 			existingUser, err := account.GetAccountByEmail(app, userInfo["email"].(string))
 			if err != nil {
 				log.Printf("Failed to get existing user: %v", err)
 				log.Println("Redirecting to login page with error %s- Failed to get existing user", err)
-				return c.Redirect(http.StatusTemporaryRedirect,
-					"http://localhost:3000")
+				return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 			}
 
 			// Generate JWT token for existing user
 			token, err := utils.GenerateJWT(existingUser.ID, existingUser.Email)
 			if err != nil {
-				log.Println("Redirecting to login page with error %v- Failed to generate token for existing user", err)
-				return c.Redirect(http.StatusTemporaryRedirect,
-					"http://localhost:3000")
+				log.Printf("Redirecting to login page with error %v- Failed to generate token for existing user", err)
+				return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 			}
 
 			// Redirect to frontend with token and user data
-			userJSON, _ := json.Marshal(existingUser)
-			redirectURL := fmt.Sprintf("http://localhost:3000/home?token=%s&user=%s",
+			userJSON, err := json.Marshal(existingUser)
+			if err != nil {
+				log.Println("Redirecting to login page with error %v- Failed to marshal user data", err)
+				return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
+			}
+			redirectURL := fmt.Sprintf("%s/home?token=%s&user=%s",
+				frontendURL,
 				token,
 				url.QueryEscape(string(userJSON)))
 
@@ -91,14 +91,14 @@ func GoogleCallBackHandler(c echo.Context) error {
 		} else {
 			log.Printf("Got error here, redirecting to login page", err)
 			// Other error, send to login page without error in url
-			return c.Redirect(http.StatusTemporaryRedirect,
-				"http://localhost:3000/login")
+			return c.Redirect(http.StatusTemporaryRedirect, frontendURL+"/login")
 		}
 	}
 
 	// Redirect to frontend with token and user data
 	userJSON, _ := json.Marshal(userDetails["user"])
-	redirectURL := fmt.Sprintf("http://localhost:3000/home?token=%s&user=%s",
+	redirectURL := fmt.Sprintf("%s/home?token=%s&user=%s",
+		frontendURL,
 		userDetails["token"],
 		url.QueryEscape(string(userJSON)))
 

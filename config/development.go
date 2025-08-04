@@ -17,5 +17,11 @@ func GetDevelopmentConfig() *Config {
 	cfg.GoogleAuth.ClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
 	cfg.GoogleAuth.RedirectURL = "http://localhost:8080/auth/google/callback"
 
+	// Frontend configuration
+	cfg.Frontend.URL = os.Getenv("FRONTEND_URL")
+	if cfg.Frontend.URL == "" {
+		cfg.Frontend.URL = "http://localhost:3000" // Default for development
+	}
+
 	return cfg
 }

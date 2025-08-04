@@ -8,6 +8,11 @@ import (
 type Config struct {
 	Database   DatabaseConfig
 	GoogleAuth GoogleAuthConfig
+	Frontend   FrontendConfig
+}
+
+type FrontendConfig struct {
+	URL string
 }
 
 type GoogleAuthConfig struct {
@@ -45,6 +50,12 @@ func GetConfig() *Config {
 		cfg.Database.Password = os.Getenv("DB_PASSWORD")
 		cfg.Database.DBName = os.Getenv("DB_NAME")
 		cfg.Database.SSLMode = os.Getenv("DB_SSL_MODE") == "true"
+
+		// Frontend configuration
+		cfg.Frontend.URL = os.Getenv("FRONTEND_URL")
+		if cfg.Frontend.URL == "" {
+			cfg.Frontend.URL = "http://localhost:3000" // Default fallback
+		}
 
 		return cfg
 	}

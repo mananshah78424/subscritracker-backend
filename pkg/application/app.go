@@ -33,7 +33,7 @@ func NewApp(ctx context.Context) (*App, error) {
 
 	// Add CORS middleware globally
 	app.Echo.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000"},
+		AllowOrigins:     []string{app.Config.Frontend.URL, "http://127.0.0.1:3000"}, // Keep 127.0.0.1 for local development
 		AllowMethods:     []string{echo.GET, echo.HEAD, echo.PUT, echo.PATCH, echo.POST, echo.DELETE},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 		AllowCredentials: true,
