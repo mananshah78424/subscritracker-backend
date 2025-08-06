@@ -2,7 +2,6 @@ package subscription_channels
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/models"
@@ -20,7 +19,7 @@ func GetChannelById(c echo.Context, id string) (*models.Subscription_Channels, e
 		Scan(context.Background())
 
 	if err != nil {
-		log.Println("Error getting account by email: ", err)
+		log.Println("Error getting channel by id: ", err)
 		return nil, err
 	}
 
@@ -58,7 +57,6 @@ func CreateChannel(c echo.Context, channel models.Subscription_Channels) (*model
 		channel.ChannelType = "streaming"
 	}
 
-	fmt.Println("Creating channel: ", channel)
 	err := app.Database.NewInsert().
 		Model(&channel).
 		Scan(context.Background())
