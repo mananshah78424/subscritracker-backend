@@ -6,6 +6,7 @@ import (
 	"subscritracker/pkg/account"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/auth"
+	subscription_channels "subscritracker/pkg/subscription-channels"
 
 	"github.com/labstack/echo/v4"
 )
@@ -52,6 +53,7 @@ func registerRoutes(app *application.App) error {
 	app.Echo.Use(appMiddleware(app))
 	auth.RegisterRoutes(app)
 	account.RegisterRoutes(app)
+	subscription_channels.RegisterRoutes(app)
 
 	return nil
 }

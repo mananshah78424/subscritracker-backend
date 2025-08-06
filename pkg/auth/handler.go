@@ -46,7 +46,7 @@ func GoogleCallBackHandler(c echo.Context) error {
 	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		log.Println("Failed to exchange authorization code for access token:", err)
-		log.Println("Redirecting to login page with error %s- Failed to exchange authorization code for access token", err)
+		log.Printf("Redirecting to login page with error %s- Failed to exchange authorization code for access token", err)
 		return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 	}
 
@@ -54,7 +54,7 @@ func GoogleCallBackHandler(c echo.Context) error {
 	userInfo, err := fetchGoogleUserInfo(token.AccessToken)
 	if err != nil {
 		log.Println("Failed to fetch user info:", err)
-		log.Println("Redirecting to login page with error %s- Failed to fetch user info", err)
+		log.Printf("Redirecting to login page with error %s- Failed to fetch user info", err)
 		return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 	}
 
@@ -65,7 +65,7 @@ func GoogleCallBackHandler(c echo.Context) error {
 			existingUser, err := account.GetAccountByEmail(app, userInfo["email"].(string))
 			if err != nil {
 				log.Printf("Failed to get existing user: %v", err)
-				log.Println("Redirecting to login page with error %s- Failed to get existing user", err)
+				log.Printf("Redirecting to login page with error %v - Failed to get existing user", err)
 				return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 			}
 
@@ -79,7 +79,7 @@ func GoogleCallBackHandler(c echo.Context) error {
 			// Redirect to frontend with token and user data
 			userJSON, err := json.Marshal(existingUser)
 			if err != nil {
-				log.Println("Redirecting to login page with error %v- Failed to marshal user data", err)
+				log.Printf("Redirecting to login page with error %v- Failed to marshal user data", err)
 				return c.Redirect(http.StatusTemporaryRedirect, frontendURL)
 			}
 			redirectURL := fmt.Sprintf("%s/home?token=%s&user=%s",
@@ -89,7 +89,7 @@ func GoogleCallBackHandler(c echo.Context) error {
 
 			return c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 		} else {
-			log.Printf("Got error here, redirecting to login page", err)
+			log.Println("Got error here, redirecting to login page", err)
 			// Other error, send to login page without error in url
 			return c.Redirect(http.StatusTemporaryRedirect, frontendURL+"/login")
 		}

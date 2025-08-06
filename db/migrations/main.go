@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"subscritracker/pkg/utils"
@@ -15,9 +14,9 @@ func main() {
 	direction := os.Args[1]
 	switch direction {
 	case "up":
-		fmt.Println("Running up migrations")
+		log.Println("Running up migrations")
 	case "down":
-		fmt.Println("Running down migrations")
+		log.Println("Running down migrations")
 	default:
 		log.Fatal("Invalid direction, must be up or down")
 	}
@@ -52,5 +51,5 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	fmt.Println("Migrations completed successfully")
+	log.Println("Migrations completed successfully")
 }
