@@ -57,9 +57,9 @@ func CreateChannel(c echo.Context, channel models.Subscription_Channels) (*model
 		channel.ChannelType = "streaming"
 	}
 
-	err := app.Database.NewInsert().
+	_, err := app.Database.NewInsert().
 		Model(&channel).
-		Scan(context.Background())
+		Exec(context.Background())
 
 	if err != nil {
 		log.Println("Error creating channel: ", err)
