@@ -20,9 +20,8 @@ func CreateSubscriptionEvent(c echo.Context, request models.Subscription_Event) 
 	_, err := app.Database.NewInsert().
 		Model(&request).
 		Exec(context.Background())
-	log.Println("Created subscription event", request)
-	log.Println("Error", err)
 	if err != nil {
+		log.Println("Error creating subscription event:", err)
 		return models.Subscription_Event{}, err
 	}
 

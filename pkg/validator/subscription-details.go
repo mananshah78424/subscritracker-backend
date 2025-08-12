@@ -7,6 +7,47 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// parseTimeOfDay parses a time string in "HH:MM" format and returns a normalized time.Time
+// with a consistent base date (year 0, month 1, day 1) to avoid date-related comparison issues.
+//
+// Benefits of this approach:
+// 1. Consistent base date prevents timezone and date-related comparison issues
+// 2. All time-of-day values can be compared reliably using standard time.Time methods
+// 3. Database storage is consistent and predictable
+// 4. Avoids issues with daylight saving time changes affecting stored times
+//
+// Example: "15:30" becomes 0000-01-01 15:30:00 UTC
+// This allows for reliable time comparisons without worrying about the actual date.
+func parseTimeOfDay(timeStr string) (*time.Time, error) {
+	if timeStr == "" {
+		return nil, nil
+	}
+
+	// Validate the time string format first
+	if len(timeStr) != 5 || timeStr[2] != ':' {
+		return nil, errors.New("time format must be HH:MM")
+	}
+
+	t, err := time.Parse("15:04", timeStr)
+	if err != nil {
+		return nil, errors.New("invalid time format. Expected HH:MM (e.g., 14:30)")
+	}
+
+	// Validate hour and minute ranges
+	hour := t.Hour()
+	minute := t.Minute()
+	if hour < 0 || hour > 23 {
+		return nil, errors.New("hour must be between 00 and 23")
+	}
+	if minute < 0 || minute > 59 {
+		return nil, errors.New("minute must be between 00 and 59")
+	}
+
+	// Normalize to a fixed date (year 0, month 1, day 1) to avoid date-related issues
+	normalized := time.Date(0, 1, 1, t.Hour(), t.Minute(), 0, 0, time.UTC)
+	return &normalized, nil
+}
+
 type SubscriptionDetailsRequest struct {
 	SubscriptionChannelID int     `json:"subscription_channel_id" form:"subscription_channel_id" validate:"required"`
 	StartDate             string  `json:"start_date" form:"start_date"`
@@ -44,6 +85,21 @@ func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDeta
 		MonthlyBill:           request.MonthlyBill,
 	}
 
+	// Validate status if provided
+	if request.Status != "" {
+		validStatuses := []string{"active", "inactive", "paused", "cancelled"}
+		statusValid := false
+		for _, validStatus := range validStatuses {
+			if request.Status == validStatus {
+				statusValid = true
+				break
+			}
+		}
+		if !statusValid {
+			return nil, errors.New("invalid status. Must be one of: active, inactive, paused, cancelled")
+		}
+	}
+
 	// Parse StartDate
 	if request.StartDate != "" {
 		if t, err := time.Parse("2006-01-02", request.StartDate); err == nil {
@@ -62,22 +118,15 @@ func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDeta
 		}
 	}
 
-	// Parse StartTime
-	if request.StartTime != "" {
-		if t, err := time.Parse("15:04", request.StartTime); err == nil {
-			parsed.StartTime = &t
-		} else {
-			return nil, errors.New("invalid start_time format. Expected HH:MM")
-		}
+	// Parse StartTime using the normalized time-of-day parser
+	var err error
+	if parsed.StartTime, err = parseTimeOfDay(request.StartTime); err != nil {
+		return nil, errors.New("invalid start_time format. Expected HH:MM")
 	}
 
-	// Parse DueTime
-	if request.DueTime != "" {
-		if t, err := time.Parse("15:04", request.DueTime); err == nil {
-			parsed.DueTime = &t
-		} else {
-			return nil, errors.New("invalid due_time format. Expected HH:MM")
-		}
+	// Parse DueTime using the normalized time-of-day parser
+	if parsed.DueTime, err = parseTimeOfDay(request.DueTime); err != nil {
+		return nil, errors.New("invalid due_time format. Expected HH:MM")
 	}
 
 	// Parse ReminderDate
@@ -89,12 +138,22 @@ func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDeta
 		}
 	}
 
-	// Parse ReminderTime
-	if request.ReminderTime != "" {
-		if t, err := time.Parse("15:04", request.ReminderTime); err == nil {
-			parsed.ReminderTime = &t
-		} else {
-			return nil, errors.New("invalid reminder_time format. Expected HH:MM")
+	// Parse ReminderTime using the normalized time-of-day parser
+	if parsed.ReminderTime, err = parseTimeOfDay(request.ReminderTime); err != nil {
+		return nil, errors.New("invalid reminder_time format. Expected HH:MM")
+	}
+
+	// Validate time logic: if both start and due times are provided, start should be before due
+	if parsed.StartTime != nil && parsed.DueTime != nil {
+		if parsed.StartTime.After(*parsed.DueTime) {
+			return nil, errors.New("start_time cannot be after due_time")
+		}
+	}
+
+	// Validate date logic: if both start and due dates are provided, start should be before due
+	if parsed.StartDate != nil && parsed.DueDate != nil {
+		if parsed.StartDate.After(*parsed.DueDate) {
+			return nil, errors.New("start_date cannot be after due_date")
 		}
 	}
 
