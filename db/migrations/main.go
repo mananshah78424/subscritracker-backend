@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"subscritracker/pkg/utils"
 
 	"github.com/golang-migrate/migrate"
@@ -17,8 +18,15 @@ func main() {
 		log.Println("Running up migrations")
 	case "down":
 		log.Println("Running down migrations")
+	case "rollback":
+		log.Println("Rolling back latest migration")
+	case "force":
+		if len(os.Args) < 3 {
+			log.Fatal("Force command requires a version number")
+		}
+		log.Printf("Forcing database version to %s", os.Args[2])
 	default:
-		log.Fatal("Invalid direction, must be up or down")
+		log.Fatal("Invalid direction, must be up, down, rollback, or force")
 	}
 	db, databaseErr := utils.NewDatabase()
 	if databaseErr != nil {
@@ -45,6 +53,15 @@ func main() {
 		err = m.Up()
 	case "down":
 		err = m.Down()
+	case "rollback":
+		err = m.Steps(-1) // Rollback 1 step (latest migration)
+	case "force":
+		version := os.Args[2]
+		versionInt, err := strconv.Atoi(version)
+		if err != nil {
+			log.Fatalf("Invalid version number: %s", version)
+		}
+		err = m.Force(versionInt)
 	}
 
 	if err != nil {

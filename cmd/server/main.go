@@ -7,6 +7,8 @@ import (
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/auth"
 	subscription_channels "subscritracker/pkg/subscription-channels"
+	subscription_details "subscritracker/pkg/subscription-details"
+	subscription_events "subscritracker/pkg/subscription-events"
 
 	"github.com/labstack/echo/v4"
 )
@@ -54,6 +56,8 @@ func registerRoutes(app *application.App) error {
 	auth.RegisterRoutes(app)
 	account.RegisterRoutes(app)
 	subscription_channels.RegisterRoutes(app)
+	subscription_details.RegisterRoutes(app)
+	subscription_events.RegisterRoutes(app)
 
 	return nil
 }

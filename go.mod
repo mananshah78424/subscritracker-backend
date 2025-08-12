@@ -38,7 +38,6 @@ require (
 require (
 	github.com/golang-migrate/migrate v3.5.4+incompatible
 	github.com/jinzhu/inflection v1.0.0 // indirect
-	github.com/labstack/echo v3.3.10+incompatible
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect

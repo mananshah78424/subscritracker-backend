@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"log"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/models"
@@ -19,10 +20,28 @@ func GetAccountById(app *application.App, id int) (*models.Account, error) {
 		Scan(context.Background())
 
 	if err != nil {
+		// Check if it's a "no rows" error from Bun ORM
+		if err.Error() == "sql: no rows in result set" || err.Error() == "no rows in result set" {
+			return nil, errors.New("account not found")
+		}
 		return nil, err
 	}
 
 	return account, nil
+}
+
+func CheckAccountExists(app *application.App, id int) (bool, error) {
+	_, err := GetAccountById(app, id)
+	if err != nil {
+		// If the error is "not found", return false without error
+		if err.Error() == "account not found" {
+			return false, nil
+		}
+		// For other errors, return the error
+		return false, err
+	}
+
+	return true, nil
 }
 
 // GetAccountByGoogleID retrieves an account by Google ID

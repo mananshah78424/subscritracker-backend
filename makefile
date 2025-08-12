@@ -26,8 +26,8 @@ db-migrate-down:
 
 .PHONY: db-rollback
 db-rollback:
-	@echo "Rolling back db migrations"
+	@echo "Rolling back latest migration"
 	go mod tidy
-	@go run db/migrations/main.go down
+	@go run db/migrations/main.go rollback
 	
 	
