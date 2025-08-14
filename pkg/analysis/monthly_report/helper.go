@@ -2,13 +2,17 @@ package monthly_report
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/models"
 )
 
+/*
+**
+GetSubscriptionDetails gets the subscription details for an account
+**
+*/
 func GetSubscriptionDetails(app *application.App, accountId int) ([]models.Subscription_Details, error) {
 	subscriptionDetails := []models.Subscription_Details{}
 	err := app.Database.NewSelect().
@@ -23,6 +27,34 @@ func GetSubscriptionDetails(app *application.App, accountId int) ([]models.Subsc
 	return subscriptionDetails, nil
 }
 
+/*
+**
+ExtractMonthlyData extracts the month and year from the due date of the subscription details
+and returns a list of MonthlyData objects
+Creates an object like this:
+[
+
+	{
+		"month": "January",
+		"year": 2025,
+		"cost": 100.0
+	},
+	{
+		"month": "February",
+		"year": 2025,
+		"cost": 200.0
+	},
+	{
+		"month": "January",
+		"year": 2025,
+		"cost": 120.0
+	},
+	...
+
+]
+Same month can have multiple entries if there are multiple subscriptions
+**
+*/
 func ExtractMonthlyData(subscriptionDetails []models.Subscription_Details) ([]MonthlyData, error) {
 	monthlyData := []MonthlyData{}
 
@@ -39,12 +71,40 @@ func ExtractMonthlyData(subscriptionDetails []models.Subscription_Details) ([]Mo
 	return monthlyData, nil
 }
 
-func ExtractMonthAndYear(date time.Time) (string, string) {
+/*
+**
+ExtractMonthAndYear extracts the month and year from the due date of the subscription details
+and returns month as string and year as int
+**
+*/
+func ExtractMonthAndYear(date time.Time) (string, int) {
 	month := date.Month().String()
-	year := strconv.Itoa(date.Year())
+	year := date.Year()
 	return month, year
 }
 
+/*
+**
+AggregateMonthlyTotals aggregates the monthly data and returns a list of MonthlyData objects
+Creates an object like this:
+[
+
+	{
+		"month": "January",
+		"year": 2025,
+		"cost": 100.0
+	},
+	{
+		"month": "February",
+		"year": 2025,
+		"cost": 200.0
+	},
+	...
+
+]
+Each entry is the total cost for that month so total of 12 entries
+**
+*/
 func AggregateMonthlyTotals(subscriptionDetails []models.Subscription_Details) ([]MonthlyData, error) {
 	// First, get the monthly data to extract month/year info
 	monthlyData, err := ExtractMonthlyData(subscriptionDetails)
@@ -52,7 +112,8 @@ func AggregateMonthlyTotals(subscriptionDetails []models.Subscription_Details) (
 		return nil, err
 	}
 
-	year := "2025"
+	// Hardcoded for now
+	year := 2025
 	months := []string{"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
 	monthlyBreakdown := []MonthlyData{}
 
