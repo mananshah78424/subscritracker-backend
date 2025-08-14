@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"subscritracker/pkg/account"
+	analysis "subscritracker/pkg/analysis"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/auth"
 	subscription_channels "subscritracker/pkg/subscription-channels"
@@ -58,6 +59,7 @@ func registerRoutes(app *application.App) error {
 	subscription_channels.RegisterRoutes(app)
 	subscription_details.RegisterRoutes(app)
 	subscription_events.RegisterRoutes(app)
+	analysis.RegisterRoutes(app)
 
 	return nil
 }
