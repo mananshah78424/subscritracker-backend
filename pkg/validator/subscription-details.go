@@ -73,6 +73,19 @@ type ParsedSubscriptionDetails struct {
 	ReminderTime          *time.Time
 }
 
+// FilterOptions defines the available filter and sort options for subscription details
+type FilterOptions struct {
+	Status        string     `json:"status" query:"status"`                   // Filter by status (active, inactive, paused, cancelled)
+	SortBy        string     `json:"sort_by" query:"sort_by"`                 // Sort field (channel_name, monthly_bill, due_date, start_date, status)
+	SortOrder     string     `json:"sort_order" query:"sort_order"`           // Sort direction (asc, desc)
+	MinCost       *float64   `json:"min_cost" query:"min_cost"`               // Minimum monthly cost
+	MaxCost       *float64   `json:"max_cost" query:"max_cost"`               // Maximum monthly cost
+	StartDateFrom *time.Time `json:"start_date_from" query:"start_date_from"` // Filter subscriptions starting from this date
+	StartDateTo   *time.Time `json:"start_date_to" query:"start_date_to"`     // Filter subscriptions starting before this date
+	DueDateFrom   *time.Time `json:"due_date_from" query:"due_date_from"`     // Filter subscriptions due from this date
+	DueDateTo     *time.Time `json:"due_date_to" query:"due_date_to"`         // Filter subscriptions due before this date
+}
+
 func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDetails, error) {
 	var request SubscriptionDetailsRequest
 	if err := c.Bind(&request); err != nil {
@@ -158,4 +171,67 @@ func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDeta
 	}
 
 	return parsed, nil
+}
+
+// ValidateSubscriptionDetailsFilters validates the filter options for subscription details queries
+func ValidateSubscriptionDetailsFilters(c echo.Context) (*FilterOptions, error) {
+	var filters FilterOptions
+	if err := c.Bind(&filters); err != nil {
+		return nil, errors.New("invalid filter parameters")
+	}
+
+	// Validate sort order
+	if filters.SortOrder != "" && filters.SortOrder != "asc" && filters.SortOrder != "desc" {
+		return nil, errors.New("sort_order must be 'asc' or 'desc'")
+	}
+
+	// Validate status if provided
+	if filters.Status != "" {
+		validStatuses := []string{"active", "inactive", "paused", "cancelled"}
+		statusValid := false
+		for _, validStatus := range validStatuses {
+			if filters.Status == validStatus {
+				statusValid = true
+				break
+			}
+		}
+		if !statusValid {
+			return nil, errors.New("invalid status. Must be one of: active, inactive, paused, cancelled")
+		}
+	}
+
+	// Validate cost range
+	if filters.MinCost != nil && filters.MaxCost != nil && *filters.MinCost > *filters.MaxCost {
+		return nil, errors.New("min_cost cannot be greater than max_cost")
+	}
+
+	// Validate sort field if provided
+	if filters.SortBy != "" {
+		validSortFields := map[string]string{
+			"monthly_bill": "sd.monthly_bill",
+			"due_date":     "sd.due_date",
+			"start_date":   "sd.start_date",
+			"status":       "sd.status",
+			"channel_name": "sc.channel_name",
+		}
+
+		if _, valid := validSortFields[filters.SortBy]; !valid {
+			return nil, errors.New("invalid sort field: " + filters.SortBy + ". Must be one of: monthly_bill, due_date, start_date, status, channel_name")
+		}
+	} else if filters.SortOrder != "" {
+		// If sort order is provided but no sort field, return error
+		return nil, errors.New("sort_order requires sort_by to be specified")
+	}
+
+	// Validate start date range
+	if filters.StartDateFrom != nil && filters.StartDateTo != nil && filters.StartDateFrom.After(*filters.StartDateTo) {
+		return nil, errors.New("start_date_from cannot be after start_date_to")
+	}
+
+	// Validate due date range
+	if filters.DueDateFrom != nil && filters.DueDateTo != nil && filters.DueDateFrom.After(*filters.DueDateTo) {
+		return nil, errors.New("due_date_from cannot be after due_date_to")
+	}
+
+	return &filters, nil
 }

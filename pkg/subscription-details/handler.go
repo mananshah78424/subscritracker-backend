@@ -68,3 +68,21 @@ func PostSubscriptionDetailsHandler(c echo.Context) error {
 func GetSubscriptionDetailsHandler(c echo.Context) error {
 	return nil
 }
+
+func GetUserSubscriptionDetailsHandler(c echo.Context) error {
+	app := c.Get("app").(*application.App)
+	accountID := c.Get("user_id").(int)
+
+	// Parse and validate filter options from query parameters
+	filters, err := validator.ValidateSubscriptionDetailsFilters(c)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	subscriptionDetails, err := GetSubscriptionDetailsByUserIdWithFilters(app, accountID, filters)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to get subscription details"})
+	}
+
+	return c.JSON(http.StatusOK, subscriptionDetails)
+}

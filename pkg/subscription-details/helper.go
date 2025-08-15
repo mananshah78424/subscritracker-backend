@@ -10,6 +10,8 @@ import (
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/models"
 
+	"subscritracker/pkg/validator"
+
 	"github.com/labstack/echo/v4"
 )
 
@@ -81,4 +83,98 @@ func CheckExistingSubscriptionByChannel(app *application.App, accountID, channel
 	}
 
 	return true, nil
+}
+
+func GetSubscriptionDetailsByUserIdWithFilters(app *application.App, accountID int, filters *validator.FilterOptions) ([]SubscriptionDetailsByAccountID, error) {
+	var subscriptionDetailsByAccountID []SubscriptionDetailsByAccountID
+
+	// Build the base query
+	query := `
+		SELECT 
+			sd.id,
+			sd.account_id,
+			sd.subscription_channel_id,
+			sc.channel_name as subscription_channel_name,
+			sc.channel_image_url,
+			sd.start_date,
+			sd.due_date,
+			sd.status,
+			sd.monthly_bill,
+			sd.reminder_date,
+			sd.reminder_time
+		FROM subscription_details sd
+		JOIN subscription_channels sc ON sd.subscription_channel_id = sc.id
+		WHERE sd.account_id = ?
+	`
+
+	args := []interface{}{accountID}
+
+	// Add status filter
+	if filters.Status != "" {
+		query += ` AND sd.status = ?`
+		args = append(args, filters.Status)
+	}
+
+	// Add cost range filters
+	if filters.MinCost != nil {
+		query += ` AND sd.monthly_bill >= ?`
+		args = append(args, *filters.MinCost)
+	}
+
+	if filters.MaxCost != nil {
+		query += ` AND sd.monthly_bill <= ?`
+		args = append(args, *filters.MaxCost)
+	}
+
+	// Add start date range filters
+	if filters.StartDateFrom != nil {
+		query += ` AND sd.start_date >= ?`
+		args = append(args, *filters.StartDateFrom)
+	}
+
+	if filters.StartDateTo != nil {
+		query += ` AND sd.start_date <= ?`
+		args = append(args, *filters.StartDateTo)
+	}
+
+	// Add due date range filters
+	if filters.DueDateFrom != nil {
+		query += ` AND sd.due_date >= ?`
+		args = append(args, *filters.DueDateFrom)
+	}
+
+	if filters.DueDateTo != nil {
+		query += ` AND sd.due_date <= ?`
+		args = append(args, *filters.DueDateTo)
+	}
+
+	// Add sorting
+	if filters.SortBy != "" {
+		// Map user-friendly sort field names to actual database column names
+		sortFieldMapping := map[string]string{
+			"monthly_bill": "sd.monthly_bill",
+			"due_date":     "sd.due_date",
+			"start_date":   "sd.start_date",
+			"status":       "sd.status",
+			"channel_name": "sc.channel_name",
+		}
+
+		sortField := sortFieldMapping[filters.SortBy]
+		query += ` ORDER BY ` + sortField
+
+		// Add sort order
+		if filters.SortOrder == "desc" {
+			query += ` DESC`
+		} else {
+			query += ` ASC` // Default to ascending
+		}
+	}
+
+	err := app.Database.NewRaw(query, args...).Scan(context.Background(), &subscriptionDetailsByAccountID)
+	if err != nil {
+		log.Println("Error getting subscription details: because of database error", err)
+		return nil, err
+	}
+
+	return subscriptionDetailsByAccountID, nil
 }
