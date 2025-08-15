@@ -150,8 +150,8 @@ func GetSubscriptionDetailsByUserIdWithFilters(app *application.App, accountID i
 
 	// Add sorting
 	if filters.SortBy != "" {
-		// Validate sort field to prevent SQL injection
-		validSortFields := map[string]string{
+		// Map user-friendly sort field names to actual database column names
+		sortFieldMapping := map[string]string{
 			"monthly_bill": "sd.monthly_bill",
 			"due_date":     "sd.due_date",
 			"start_date":   "sd.start_date",
@@ -159,15 +159,14 @@ func GetSubscriptionDetailsByUserIdWithFilters(app *application.App, accountID i
 			"channel_name": "sc.channel_name",
 		}
 
-		if sortField, valid := validSortFields[filters.SortBy]; valid {
-			query += ` ORDER BY ` + sortField
+		sortField := sortFieldMapping[filters.SortBy]
+		query += ` ORDER BY ` + sortField
 
-			// Add sort order
-			if filters.SortOrder == "desc" {
-				query += ` DESC`
-			} else {
-				query += ` ASC` // Default to ascending
-			}
+		// Add sort order
+		if filters.SortOrder == "desc" {
+			query += ` DESC`
+		} else {
+			query += ` ASC` // Default to ascending
 		}
 	}
 

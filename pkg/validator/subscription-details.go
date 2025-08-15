@@ -76,7 +76,7 @@ type ParsedSubscriptionDetails struct {
 // FilterOptions defines the available filter and sort options for subscription details
 type FilterOptions struct {
 	Status        string     `json:"status" query:"status"`                   // Filter by status (active, inactive, paused, cancelled)
-	SortBy        string     `json:"sort_by" query:"sort_by"`                 // Sort field (monthly_bill, due_date, start_date, status)
+	SortBy        string     `json:"sort_by" query:"sort_by"`                 // Sort field (channel_name, monthly_bill, due_date, start_date, status)
 	SortOrder     string     `json:"sort_order" query:"sort_order"`           // Sort direction (asc, desc)
 	MinCost       *float64   `json:"min_cost" query:"min_cost"`               // Minimum monthly cost
 	MaxCost       *float64   `json:"max_cost" query:"max_cost"`               // Maximum monthly cost
@@ -203,6 +203,24 @@ func ValidateSubscriptionDetailsFilters(c echo.Context) (*FilterOptions, error) 
 	// Validate cost range
 	if filters.MinCost != nil && filters.MaxCost != nil && *filters.MinCost > *filters.MaxCost {
 		return nil, errors.New("min_cost cannot be greater than max_cost")
+	}
+
+	// Validate sort field if provided
+	if filters.SortBy != "" {
+		validSortFields := map[string]string{
+			"monthly_bill": "sd.monthly_bill",
+			"due_date":     "sd.due_date",
+			"start_date":   "sd.start_date",
+			"status":       "sd.status",
+			"channel_name": "sc.channel_name",
+		}
+
+		if _, valid := validSortFields[filters.SortBy]; !valid {
+			return nil, errors.New("invalid sort field: " + filters.SortBy + ". Must be one of: monthly_bill, due_date, start_date, status, channel_name")
+		}
+	} else if filters.SortOrder != "" {
+		// If sort order is provided but no sort field, return error
+		return nil, errors.New("sort_order requires sort_by to be specified")
 	}
 
 	// Validate start date range
