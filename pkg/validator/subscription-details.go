@@ -51,7 +51,8 @@ func parseTimeOfDay(timeStr string) (*time.Time, error) {
 type SubscriptionDetailsRequest struct {
 	SubscriptionChannelID int     `json:"subscription_channel_id" form:"subscription_channel_id" validate:"required"`
 	StartDate             string  `json:"start_date" form:"start_date"`
-	DueDate               string  `json:"due_date" form:"due_date"`
+	DueDay                int     `json:"due_day" form:"due_day"`
+	DueType               string  `json:"due_type" form:"due_type"`
 	Status                string  `json:"status" form:"status"`
 	StartTime             string  `json:"start_time" form:"start_time"`
 	DueTime               string  `json:"due_time" form:"due_time"`
@@ -64,7 +65,8 @@ type SubscriptionDetailsRequest struct {
 type ParsedSubscriptionDetails struct {
 	SubscriptionChannelID int
 	StartDate             *time.Time
-	DueDate               *time.Time
+	DueDay                *int
+	DueType               string
 	Status                string
 	StartTime             *time.Time
 	DueTime               *time.Time
@@ -76,14 +78,15 @@ type ParsedSubscriptionDetails struct {
 // FilterOptions defines the available filter and sort options for subscription details
 type FilterOptions struct {
 	Status        string     `json:"status" query:"status"`                   // Filter by status (active, inactive, paused, cancelled)
-	SortBy        string     `json:"sort_by" query:"sort_by"`                 // Sort field (channel_name, monthly_bill, due_date, start_date, status)
+	SortBy        string     `json:"sort_by" query:"sort_by"`                 // Sort field (channel_name, monthly_bill, due_day, start_date, status)
 	SortOrder     string     `json:"sort_order" query:"sort_order"`           // Sort direction (asc, desc)
 	MinCost       *float64   `json:"min_cost" query:"min_cost"`               // Minimum monthly cost
 	MaxCost       *float64   `json:"max_cost" query:"max_cost"`               // Maximum monthly cost
 	StartDateFrom *time.Time `json:"start_date_from" query:"start_date_from"` // Filter subscriptions starting from this date
 	StartDateTo   *time.Time `json:"start_date_to" query:"start_date_to"`     // Filter subscriptions starting before this date
-	DueDateFrom   *time.Time `json:"due_date_from" query:"due_date_from"`     // Filter subscriptions due from this date
-	DueDateTo     *time.Time `json:"due_date_to" query:"due_date_to"`         // Filter subscriptions due before this date
+	DueDayFrom    *int       `json:"due_day_from" query:"due_day_from"`       // Filter subscriptions due from this day of month (1-31)
+	DueDayTo      *int       `json:"due_day_to" query:"due_day_to"`           // Filter subscriptions due before this day of month (1-31)
+	DueType       *string    `json:"due_type" query:"due_type"`               // Filter subscriptions by due type (monthly, yearly, weekly, daily)
 }
 
 func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDetails, error) {
@@ -122,13 +125,14 @@ func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDeta
 		}
 	}
 
-	// Parse DueDate
-	if request.DueDate != "" {
-		if t, err := time.Parse("2006-01-02", request.DueDate); err == nil {
-			parsed.DueDate = &t
-		} else {
-			return nil, errors.New("invalid due_date format. Expected YYYY-MM-DD")
-		}
+	// Parse DueDay
+	if request.DueDay != 0 {
+		parsed.DueDay = &request.DueDay
+	}
+
+	// Parse DueType
+	if request.DueType != "" {
+		parsed.DueType = request.DueType
 	}
 
 	// Parse StartTime using the normalized time-of-day parser
@@ -164,9 +168,9 @@ func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDeta
 	}
 
 	// Validate date logic: if both start and due dates are provided, start should be before due
-	if parsed.StartDate != nil && parsed.DueDate != nil {
-		if parsed.StartDate.After(*parsed.DueDate) {
-			return nil, errors.New("start_date cannot be after due_date")
+	if parsed.StartDate != nil && parsed.DueDay != nil {
+		if parsed.StartDate.After(time.Date(*parsed.DueDay, 1, 1, 0, 0, 0, 0, time.UTC)) {
+			return nil, errors.New("start_date cannot be after due_day")
 		}
 	}
 
@@ -209,14 +213,14 @@ func ValidateSubscriptionDetailsFilters(c echo.Context) (*FilterOptions, error) 
 	if filters.SortBy != "" {
 		validSortFields := map[string]string{
 			"monthly_bill": "sd.monthly_bill",
-			"due_date":     "sd.due_date",
+			"due_day":      "sd.due_day",
 			"start_date":   "sd.start_date",
 			"status":       "sd.status",
 			"channel_name": "sc.channel_name",
 		}
 
 		if _, valid := validSortFields[filters.SortBy]; !valid {
-			return nil, errors.New("invalid sort field: " + filters.SortBy + ". Must be one of: monthly_bill, due_date, start_date, status, channel_name")
+			return nil, errors.New("invalid sort field: " + filters.SortBy + ". Must be one of: monthly_bill, due_day, start_date, status, channel_name")
 		}
 	} else if filters.SortOrder != "" {
 		// If sort order is provided but no sort field, return error
@@ -229,8 +233,17 @@ func ValidateSubscriptionDetailsFilters(c echo.Context) (*FilterOptions, error) 
 	}
 
 	// Validate due date range
-	if filters.DueDateFrom != nil && filters.DueDateTo != nil && filters.DueDateFrom.After(*filters.DueDateTo) {
-		return nil, errors.New("due_date_from cannot be after due_date_to")
+	if filters.DueDayFrom != nil && filters.DueDayTo != nil && *filters.DueDayFrom > *filters.DueDayTo {
+		return nil, errors.New("due_day_from cannot be greater than due_day_to")
+	}
+
+	// Validate due day values are within valid range (1-31)
+	if filters.DueDayFrom != nil && (*filters.DueDayFrom < 1 || *filters.DueDayFrom > 31) {
+		return nil, errors.New("due_day_from must be between 1 and 31")
+	}
+
+	if filters.DueDayTo != nil && (*filters.DueDayTo < 1 || *filters.DueDayTo > 31) {
+		return nil, errors.New("due_day_to must be between 1 and 31")
 	}
 
 	return &filters, nil
