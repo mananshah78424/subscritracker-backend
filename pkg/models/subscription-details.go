@@ -12,7 +12,8 @@ type Subscription_Details struct {
 	AccountID             int       `bun:"account_id" json:"account_id"`
 	SubscriptionChannelID int       `bun:"subscription_channel_id" json:"subscription_channel_id"`
 	StartDate             time.Time `bun:"start_date" json:"start_date"`
-	DueDate               time.Time `bun:"due_date" json:"due_date"`
+	DueDay                int       `bun:"due_day" json:"due_day"`
+	DueType               string    `bun:"due_type" json:"due_type"`
 	Status                string    `bun:"status" json:"status"`
 	StartTime             time.Time `bun:"start_time" json:"start_time"`
 	DueTime               time.Time `bun:"due_time" json:"due_time"`

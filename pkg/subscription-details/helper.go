@@ -138,14 +138,20 @@ func GetSubscriptionDetailsByUserIdWithFilters(app *application.App, accountID i
 	}
 
 	// Add due date range filters
-	if filters.DueDateFrom != nil {
-		query += ` AND sd.due_date >= ?`
-		args = append(args, *filters.DueDateFrom)
+	if filters.DueDayFrom != nil {
+		query += ` AND sd.due_day >= ?`
+		args = append(args, *filters.DueDayFrom)
 	}
 
-	if filters.DueDateTo != nil {
-		query += ` AND sd.due_date <= ?`
-		args = append(args, *filters.DueDateTo)
+	if filters.DueDayTo != nil {
+		query += ` AND sd.due_day <= ?`
+		args = append(args, *filters.DueDayTo)
+	}
+
+	// Add due type filter
+	if filters.DueType != nil {
+		query += ` AND sd.due_type = ?`
+		args = append(args, *filters.DueType)
 	}
 
 	// Add sorting
