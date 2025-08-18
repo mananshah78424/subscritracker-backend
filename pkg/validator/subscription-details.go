@@ -167,12 +167,8 @@ func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDeta
 		}
 	}
 
-	// Validate date logic: if both start and due dates are provided, start should be before due
-	if parsed.StartDate != nil && parsed.DueDay != nil {
-		if parsed.StartDate.After(time.Date(*parsed.DueDay, 1, 1, 0, 0, 0, 0, time.UTC)) {
-			return nil, errors.New("start_date cannot be after due_day")
-		}
-	}
+	// No validation needed: due_day is a day of the month (1-31), not a date
+	// due_day represents the day of month when payment is due, independent of start_date
 
 	return parsed, nil
 }

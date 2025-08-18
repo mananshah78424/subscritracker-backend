@@ -105,7 +105,7 @@ func CalculateActiveMonths(subscription models.Subscription_Details, targetYear 
 			activeMonths = append(activeMonths, MonthlyData{
 				Month: monthName,
 				Year:  targetYear,
-				Cost:  subscription.MonthlyBill,
+				// Cost will be set by the calling function ExtractMonthlyData
 			})
 		}
 	}
