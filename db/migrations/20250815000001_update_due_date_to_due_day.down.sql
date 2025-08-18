@@ -4,9 +4,10 @@
 ALTER TABLE subscription_details 
 ADD COLUMN due_date DATE;
 
--- Convert due_day back to due_date (using current month as example)
+-- Convert due_day back to due_date using proper date construction
+-- This ensures we get a valid date in the current month
 UPDATE subscription_details 
-SET due_date = CURRENT_DATE + (due_day - EXTRACT(DAY FROM CURRENT_DATE)) * INTERVAL '1 day'
+SET due_date = DATE_TRUNC('month', CURRENT_DATE) + (due_day - 1) * INTERVAL '1 day'
 WHERE due_day IS NOT NULL;
 
 -- Drop the due_day column
