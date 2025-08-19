@@ -35,15 +35,14 @@ func PostSubscriptionDetailsHandler(c echo.Context) error {
 		SubscriptionChannelID: request.SubscriptionChannelID,
 		Status:                request.Status,
 		MonthlyBill:           request.MonthlyBill,
-		DueType:               request.DueType,
 	}
 
 	// Handle optional time fields - only set if they exist
 	if request.StartDate != nil {
 		subscriptionDetails.StartDate = *request.StartDate
 	}
-	if request.DueDay != nil {
-		subscriptionDetails.DueDay = *request.DueDay
+	if request.DueDate != nil {
+		subscriptionDetails.DueDate = *request.DueDate
 	}
 	if request.StartTime != nil {
 		subscriptionDetails.StartTime = *request.StartTime
