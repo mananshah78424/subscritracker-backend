@@ -59,7 +59,7 @@ func ExtractMonthlyData(subscriptionDetails []models.Subscription_Details) ([]Mo
 	monthlyData := []MonthlyData{}
 
 	for _, subscriptionDetail := range subscriptionDetails {
-		month, year := ExtractMonthAndYear(subscriptionDetail.DueDate)
+		month, year := ExtractMonthAndYear(subscriptionDetail.NextDueDate)
 		summary := MonthlyData{}
 		summary.Month = month
 		summary.Year = year

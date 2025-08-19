@@ -2,56 +2,69 @@ package validator
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/labstack/echo/v4"
 )
 
-// parseTimeOfDay parses a time string in "HH:MM" format and returns a normalized time.Time
-// with a consistent base date (year 0, month 1, day 1) to avoid date-related comparison issues.
-//
-// Benefits of this approach:
-// 1. Consistent base date prevents timezone and date-related comparison issues
-// 2. All time-of-day values can be compared reliably using standard time.Time methods
-// 3. Database storage is consistent and predictable
-// 4. Avoids issues with daylight saving time changes affecting stored times
-//
-// Example: "15:30" becomes 0000-01-01 15:30:00 UTC
-// This allows for reliable time comparisons without worrying about the actual date.
+// --- Helpers & Constants ---
+
+var (
+	validStatuses   = []string{"active", "inactive", "paused", "cancelled"}
+	validSortFields = map[string]string{
+		"monthly_bill":  "sd.monthly_bill",
+		"next_due_date": "sd.next_due_date",
+		"start_date":    "sd.start_date",
+		"status":        "sd.status",
+		"channel_name":  "sc.channel_name",
+	}
+)
+
+// parseTimeOfDay parses "HH:MM" and normalizes to 0000-01-01 HH:MM:00 UTC.
 func parseTimeOfDay(timeStr string) (*time.Time, error) {
 	if timeStr == "" {
 		return nil, nil
 	}
-
-	// Validate the time string format first
-	if len(timeStr) != 5 || timeStr[2] != ':' {
-		return nil, errors.New("time format must be HH:MM")
-	}
-
 	t, err := time.Parse("15:04", timeStr)
 	if err != nil {
 		return nil, errors.New("invalid time format. Expected HH:MM (e.g., 14:30)")
 	}
-
-	// Validate hour and minute ranges
-	hour := t.Hour()
-	minute := t.Minute()
-	if hour < 0 || hour > 23 {
-		return nil, errors.New("hour must be between 00 and 23")
-	}
-	if minute < 0 || minute > 59 {
-		return nil, errors.New("minute must be between 00 and 59")
-	}
-
-	// Normalize to a fixed date (year 0, month 1, day 1) to avoid date-related issues
 	normalized := time.Date(0, 1, 1, t.Hour(), t.Minute(), 0, 0, time.UTC)
 	return &normalized, nil
 }
 
+// parseDate parses YYYY-MM-DD format.
+func parseDate(dateStr, field string) (*time.Time, error) {
+	if dateStr == "" {
+		return nil, nil
+	}
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s format. Expected YYYY-MM-DD", field)
+	}
+	return &t, nil
+}
+
+// validateEnum checks if val is in allowed list.
+func validateEnum(val string, allowed []string) bool {
+	for _, v := range allowed {
+		if val == v {
+			return true
+		}
+	}
+	return false
+}
+
+// --- Request Structs ---
+
 type SubscriptionDetailsRequest struct {
 	SubscriptionChannelID int     `json:"subscription_channel_id" form:"subscription_channel_id" validate:"required"`
 	StartDate             string  `json:"start_date" form:"start_date"`
-	DueDate               string  `json:"due_date" form:"due_date"`
+	NextDueDate           string  `json:"next_due_date" form:"next_due_date"`
+	DueType               string  `json:"due_type" form:"due_type"`
+	DueDayOfMonth         int     `json:"due_day_of_month" form:"due_day_of_month"`
+	EndDate               string  `json:"end_date" form:"end_date"`
 	Status                string  `json:"status" form:"status"`
 	StartTime             string  `json:"start_time" form:"start_time"`
 	DueTime               string  `json:"due_time" form:"due_time"`
@@ -60,120 +73,102 @@ type SubscriptionDetailsRequest struct {
 	ReminderTime          string  `json:"reminder_time" form:"reminder_time"`
 }
 
-// ParsedSubscriptionDetails contains the parsed time.Time values
 type ParsedSubscriptionDetails struct {
 	SubscriptionChannelID int
 	StartDate             *time.Time
-	DueDate               *time.Time
+	NextDueDate           *time.Time
+	EndDate               *time.Time
 	Status                string
+	DueType               string
+	DueDayOfMonth         int
+	MonthlyBill           float64
 	StartTime             *time.Time
 	DueTime               *time.Time
-	MonthlyBill           float64
 	ReminderDate          *time.Time
 	ReminderTime          *time.Time
 }
 
-// FilterOptions defines the available filter and sort options for subscription details
 type FilterOptions struct {
-	Status        string     `json:"status" query:"status"`                   // Filter by status (active, inactive, paused, cancelled)
-	SortBy        string     `json:"sort_by" query:"sort_by"`                 // Sort field (channel_name, monthly_bill, due_date, start_date, status)
-	SortOrder     string     `json:"sort_order" query:"sort_order"`           // Sort direction (asc, desc)
-	MinCost       *float64   `json:"min_cost" query:"min_cost"`               // Minimum monthly cost
-	MaxCost       *float64   `json:"max_cost" query:"max_cost"`               // Maximum monthly cost
-	StartDateFrom *time.Time `json:"start_date_from" query:"start_date_from"` // Filter subscriptions starting from this date
-	StartDateTo   *time.Time `json:"start_date_to" query:"start_date_to"`     // Filter subscriptions starting before this date
-	DueDateFrom   *time.Time `json:"due_date_from" query:"due_date_from"`     // Filter subscriptions due from this date
-	DueDateTo     *time.Time `json:"due_date_to" query:"due_date_to"`         // Filter subscriptions due before this date
+	Status          string     `json:"status" query:"status"`
+	SortBy          string     `json:"sort_by" query:"sort_by"`
+	SortOrder       string     `json:"sort_order" query:"sort_order"`
+	MinCost         *float64   `json:"min_cost" query:"min_cost"`
+	MaxCost         *float64   `json:"max_cost" query:"max_cost"`
+	StartDateFrom   *time.Time `json:"start_date_from" query:"start_date_from"`
+	StartDateTo     *time.Time `json:"start_date_to" query:"start_date_to"`
+	NextDueDateFrom *time.Time `json:"next_due_date_from" query:"next_due_date_from"`
+	NextDueDateTo   *time.Time `json:"next_due_date_to" query:"next_due_date_to"`
 }
 
+// --- Validators ---
+
 func ValidateSubscriptionDetailsRequest(c echo.Context) (*ParsedSubscriptionDetails, error) {
-	var request SubscriptionDetailsRequest
-	if err := c.Bind(&request); err != nil {
+	var req SubscriptionDetailsRequest
+	if err := c.Bind(&req); err != nil {
 		return nil, err
 	}
 
 	parsed := &ParsedSubscriptionDetails{
-		SubscriptionChannelID: request.SubscriptionChannelID,
-		Status:                request.Status,
-		MonthlyBill:           request.MonthlyBill,
+		SubscriptionChannelID: req.SubscriptionChannelID,
+		MonthlyBill:           req.MonthlyBill,
+		Status:                defaultIfEmpty(req.Status, "active"),
+		DueType:               defaultIfEmpty(req.DueType, "monthly"),
+		DueDayOfMonth:         defaultIfZero(req.DueDayOfMonth, 1),
 	}
 
-	// Validate status if provided
-	if request.Status != "" {
-		validStatuses := []string{"active", "inactive", "paused", "cancelled"}
-		statusValid := false
-		for _, validStatus := range validStatuses {
-			if request.Status == validStatus {
-				statusValid = true
-				break
-			}
-		}
-		if !statusValid {
-			return nil, errors.New("invalid status. Must be one of: active, inactive, paused, cancelled")
-		}
+	// Validate status
+	if !validateEnum(parsed.Status, validStatuses) {
+		return nil, errors.New("invalid status. Must be one of: active, inactive, paused, cancelled")
 	}
 
-	// Parse StartDate
-	if request.StartDate != "" {
-		if t, err := time.Parse("2006-01-02", request.StartDate); err == nil {
-			parsed.StartDate = &t
-		} else {
-			return nil, errors.New("invalid start_date format. Expected YYYY-MM-DD")
-		}
-	}
-
-	// Parse DueDate
-	if request.DueDate != "" {
-		if t, err := time.Parse("2006-01-02", request.DueDate); err == nil {
-			parsed.DueDate = &t
-		} else {
-			return nil, errors.New("invalid due_date format. Expected YYYY-MM-DD")
-		}
-	}
-
-	// Parse StartTime using the normalized time-of-day parser
+	// Dates
 	var err error
-	if parsed.StartTime, err = parseTimeOfDay(request.StartTime); err != nil {
-		return nil, errors.New("invalid start_time format. Expected HH:MM")
+	if parsed.StartDate, err = parseDate(req.StartDate, "start_date"); err != nil {
+		return nil, err
+	}
+	if parsed.StartDate == nil {
+		now := time.Now()
+		parsed.StartDate = &now
+	}
+	if parsed.NextDueDate, err = parseDate(req.NextDueDate, "next_due_date"); err != nil {
+		return nil, err
+	}
+	if parsed.EndDate, err = parseDate(req.EndDate, "end_date"); err != nil {
+		return nil, err
+	}
+	if parsed.ReminderDate, err = parseDate(req.ReminderDate, "reminder_date"); err != nil {
+		return nil, err
 	}
 
-	// Parse DueTime using the normalized time-of-day parser
-	if parsed.DueTime, err = parseTimeOfDay(request.DueTime); err != nil {
-		return nil, errors.New("invalid due_time format. Expected HH:MM")
+	// Times
+	if parsed.StartTime, err = parseTimeOfDay(req.StartTime); err != nil {
+		return nil, err
+	}
+	if parsed.DueTime, err = parseTimeOfDay(req.DueTime); err != nil {
+		return nil, err
+	}
+	if parsed.ReminderTime, err = parseTimeOfDay(req.ReminderTime); err != nil {
+		return nil, err
 	}
 
-	// Parse ReminderDate
-	if request.ReminderDate != "" {
-		if t, err := time.Parse("2006-01-02", request.ReminderDate); err == nil {
-			parsed.ReminderDate = &t
-		} else {
-			return nil, errors.New("invalid reminder_date format. Expected YYYY-MM-DD")
-		}
+	// Channel Id
+	if parsed.SubscriptionChannelID == 0 {
+		return nil, errors.New("subscription_channel_id is required")
 	}
 
-	// Parse ReminderTime using the normalized time-of-day parser
-	if parsed.ReminderTime, err = parseTimeOfDay(request.ReminderTime); err != nil {
-		return nil, errors.New("invalid reminder_time format. Expected HH:MM")
+	// Validate time logic
+	if parsed.StartTime != nil && parsed.DueTime != nil && parsed.StartTime.After(*parsed.DueTime) {
+		return nil, errors.New("start_time cannot be after due_time")
 	}
 
-	// Validate time logic: if both start and due times are provided, start should be before due
-	if parsed.StartTime != nil && parsed.DueTime != nil {
-		if parsed.StartTime.After(*parsed.DueTime) {
-			return nil, errors.New("start_time cannot be after due_time")
-		}
-	}
-
-	// Validate date logic: if both start and due dates are provided, start should be before due
-	if parsed.StartDate != nil && parsed.DueDate != nil {
-		if parsed.StartDate.After(*parsed.DueDate) {
-			return nil, errors.New("start_date cannot be after due_date")
-		}
+	// Validate bill
+	if parsed.MonthlyBill == 0 {
+		return nil, errors.New("monthly_bill is required")
 	}
 
 	return parsed, nil
 }
 
-// ValidateSubscriptionDetailsFilters validates the filter options for subscription details queries
 func ValidateSubscriptionDetailsFilters(c echo.Context) (*FilterOptions, error) {
 	var filters FilterOptions
 	if err := c.Bind(&filters); err != nil {
@@ -185,19 +180,9 @@ func ValidateSubscriptionDetailsFilters(c echo.Context) (*FilterOptions, error) 
 		return nil, errors.New("sort_order must be 'asc' or 'desc'")
 	}
 
-	// Validate status if provided
-	if filters.Status != "" {
-		validStatuses := []string{"active", "inactive", "paused", "cancelled"}
-		statusValid := false
-		for _, validStatus := range validStatuses {
-			if filters.Status == validStatus {
-				statusValid = true
-				break
-			}
-		}
-		if !statusValid {
-			return nil, errors.New("invalid status. Must be one of: active, inactive, paused, cancelled")
-		}
+	// Validate status
+	if filters.Status != "" && !validateEnum(filters.Status, validStatuses) {
+		return nil, errors.New("invalid status. Must be one of: active, inactive, paused, cancelled")
 	}
 
 	// Validate cost range
@@ -205,33 +190,37 @@ func ValidateSubscriptionDetailsFilters(c echo.Context) (*FilterOptions, error) 
 		return nil, errors.New("min_cost cannot be greater than max_cost")
 	}
 
-	// Validate sort field if provided
+	// Validate sort field
 	if filters.SortBy != "" {
-		validSortFields := map[string]string{
-			"monthly_bill": "sd.monthly_bill",
-			"due_date":     "sd.due_date",
-			"start_date":   "sd.start_date",
-			"status":       "sd.status",
-			"channel_name": "sc.channel_name",
-		}
-
-		if _, valid := validSortFields[filters.SortBy]; !valid {
-			return nil, errors.New("invalid sort field: " + filters.SortBy + ". Must be one of: monthly_bill, due_date, start_date, status, channel_name")
+		if _, ok := validSortFields[filters.SortBy]; !ok {
+			return nil, fmt.Errorf("invalid sort field: %s. Must be one of: monthly_bill, next_due_date, start_date, status, channel_name", filters.SortBy)
 		}
 	} else if filters.SortOrder != "" {
-		// If sort order is provided but no sort field, return error
 		return nil, errors.New("sort_order requires sort_by to be specified")
 	}
 
-	// Validate start date range
+	// Validate date ranges
 	if filters.StartDateFrom != nil && filters.StartDateTo != nil && filters.StartDateFrom.After(*filters.StartDateTo) {
 		return nil, errors.New("start_date_from cannot be after start_date_to")
 	}
-
-	// Validate due date range
-	if filters.DueDateFrom != nil && filters.DueDateTo != nil && filters.DueDateFrom.After(*filters.DueDateTo) {
-		return nil, errors.New("due_date_from cannot be after due_date_to")
+	if filters.NextDueDateFrom != nil && filters.NextDueDateTo != nil && filters.NextDueDateFrom.After(*filters.NextDueDateTo) {
+		return nil, errors.New("next_due_date_from cannot be after next_due_date_to")
 	}
 
 	return &filters, nil
+}
+
+// --- Utility defaults ---
+
+func defaultIfEmpty(val, def string) string {
+	if val == "" {
+		return def
+	}
+	return val
+}
+func defaultIfZero(val, def int) int {
+	if val == 0 {
+		return def
+	}
+	return val
 }
