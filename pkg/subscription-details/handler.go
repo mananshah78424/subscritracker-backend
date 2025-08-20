@@ -3,8 +3,10 @@ package subscriptiondetails
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/models"
+	subscription_channels "subscritracker/pkg/subscription-channels"
 	"subscritracker/pkg/validator"
 
 	"github.com/labstack/echo/v4"
@@ -18,9 +20,15 @@ func PostSubscriptionDetailsHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	// Check if user already has a subscription to this channel
+	// Check if subscription channel exists
 	app := c.Get("app").(*application.App)
-	existingSubscription, err := CheckExistingSubscriptionByChannel(app, accountID, request.SubscriptionChannelID)
+	subscriptionChannel, err := subscription_channels.GetChannelById(c, strconv.Itoa(request.SubscriptionChannelID))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to get subscription channel: " + err.Error()})
+	}
+
+	// Check if user already has a subscription to this channel
+	existingSubscription, err := CheckExistingSubscriptionByChannel(app, accountID, subscriptionChannel.ID)
 	if err != nil {
 		log.Println("Error checking existing subscription:", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to check existing subscription"})
@@ -35,26 +43,43 @@ func PostSubscriptionDetailsHandler(c echo.Context) error {
 		SubscriptionChannelID: request.SubscriptionChannelID,
 		Status:                request.Status,
 		MonthlyBill:           request.MonthlyBill,
+		DueType:               request.DueType,
+		DueDayOfMonth:         request.DueDayOfMonth,
+		// Initialize optional time fields to nil explicitly
+		EndDate:      nil,
+		StartTime:    nil,
+		DueTime:      nil,
+		ReminderDate: nil,
+		ReminderTime: nil,
 	}
 
 	// Handle optional time fields - only set if they exist
 	if request.StartDate != nil {
 		subscriptionDetails.StartDate = *request.StartDate
 	}
-	if request.DueDate != nil {
-		subscriptionDetails.DueDate = *request.DueDate
+	if request.NextDueDate != nil {
+		subscriptionDetails.NextDueDate = *request.NextDueDate
+	}
+	if request.EndDate != nil {
+		subscriptionDetails.EndDate = request.EndDate
 	}
 	if request.StartTime != nil {
-		subscriptionDetails.StartTime = *request.StartTime
+		subscriptionDetails.StartTime = request.StartTime
 	}
 	if request.DueTime != nil {
-		subscriptionDetails.DueTime = *request.DueTime
+		subscriptionDetails.DueTime = request.DueTime
 	}
 	if request.ReminderDate != nil {
-		subscriptionDetails.ReminderDate = *request.ReminderDate
+		subscriptionDetails.ReminderDate = request.ReminderDate
 	}
 	if request.ReminderTime != nil {
-		subscriptionDetails.ReminderTime = *request.ReminderTime
+		subscriptionDetails.ReminderTime = request.ReminderTime
+	}
+
+	// Calculate NextDueDate only if it's not provided in the request
+	// Note: StartDate must be set before calling CalculateNextDueDate
+	if request.NextDueDate == nil {
+		subscriptionDetails.NextDueDate = CalculateNextDueDate(subscriptionDetails.DueType, subscriptionDetails.DueDayOfMonth, subscriptionDetails.StartDate)
 	}
 
 	createdSubscriptionDetails, err := CreateSubscriptionDetails(c, subscriptionDetails)

@@ -97,7 +97,7 @@ func GetSubscriptionDetailsByUserIdWithFilters(app *application.App, accountID i
 			sc.channel_name as subscription_channel_name,
 			sc.channel_image_url,
 			sd.start_date,
-			sd.due_date,
+			sd.next_due_date,
 			sd.status,
 			sd.monthly_bill,
 			sd.reminder_date,
@@ -138,25 +138,25 @@ func GetSubscriptionDetailsByUserIdWithFilters(app *application.App, accountID i
 	}
 
 	// Add due date range filters
-	if filters.DueDateFrom != nil {
-		query += ` AND sd.due_date >= ?`
-		args = append(args, *filters.DueDateFrom)
+	if filters.NextDueDateFrom != nil {
+		query += ` AND sd.next_due_date >= ?`
+		args = append(args, *filters.NextDueDateFrom)
 	}
 
-	if filters.DueDateTo != nil {
-		query += ` AND sd.due_date <= ?`
-		args = append(args, *filters.DueDateTo)
+	if filters.NextDueDateTo != nil {
+		query += ` AND sd.next_due_date <= ?`
+		args = append(args, *filters.NextDueDateTo)
 	}
 
 	// Add sorting
 	if filters.SortBy != "" {
 		// Map user-friendly sort field names to actual database column names
 		sortFieldMapping := map[string]string{
-			"monthly_bill": "sd.monthly_bill",
-			"due_date":     "sd.due_date",
-			"start_date":   "sd.start_date",
-			"status":       "sd.status",
-			"channel_name": "sc.channel_name",
+			"monthly_bill":  "sd.monthly_bill",
+			"next_due_date": "sd.next_due_date",
+			"start_date":    "sd.start_date",
+			"status":        "sd.status",
+			"channel_name":  "sc.channel_name",
 		}
 
 		sortField := sortFieldMapping[filters.SortBy]
@@ -177,4 +177,28 @@ func GetSubscriptionDetailsByUserIdWithFilters(app *application.App, accountID i
 	}
 
 	return subscriptionDetailsByAccountID, nil
+}
+
+// CalculateNextDueDate calculates the next due date based on start date, due type, and due day of month
+// This function should be used for new subscriptions to determine when the first billing should occur
+func CalculateNextDueDate(dueType string, dueDayOfMonth int, startDate time.Time) time.Time {
+	currentDate := time.Now()
+	// If the due day of month is 1, then simply add a month to the current date and return the 1st of the next month
+	if dueDayOfMonth == 1 {
+		nextDueDate := currentDate.AddDate(0, 1, 0)
+		return time.Date(nextDueDate.Year(), nextDueDate.Month(), 1, 0, 0, 0, 0, nextDueDate.Location())
+	}
+
+	// If the due day of month is not 1, then we need to calculate the next due date based on the current date.
+	// If current date > due day of month, then add a month to the current date and return the due day of the next month.
+
+	if currentDate.Day() > dueDayOfMonth {
+		nextDueDate := currentDate.AddDate(0, 1, 0)
+		return time.Date(nextDueDate.Year(), nextDueDate.Month(), dueDayOfMonth, 0, 0, 0, 0, nextDueDate.Location())
+	}
+
+	// If current date < due day of month, then return the due day of the current month.
+	nextDueDate := time.Date(currentDate.Year(), currentDate.Month(), dueDayOfMonth, 0, 0, 0, 0, currentDate.Location())
+	return nextDueDate
+
 }

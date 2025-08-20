@@ -2,6 +2,8 @@ package subscription_channels
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"log"
 	"subscritracker/pkg/application"
 	"subscritracker/pkg/models"
@@ -19,7 +21,9 @@ func GetChannelById(c echo.Context, id string) (*models.Subscription_Channels, e
 		Scan(context.Background())
 
 	if err != nil {
-		log.Println("Error getting channel by id: ", err)
+		if err == sql.ErrNoRows {
+			return nil, errors.New("subscription channel not found")
+		}
 		return nil, err
 	}
 
