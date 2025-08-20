@@ -179,104 +179,26 @@ func GetSubscriptionDetailsByUserIdWithFilters(app *application.App, accountID i
 	return subscriptionDetailsByAccountID, nil
 }
 
-// Calculate NextDueDate based on DueType and DueDayOfMonth and Current Date
-func CalculateNextDueDate(dueType string, dueDayOfMonth int, currentDate time.Time) time.Time {
-	// First, try to create a date in the current month with the specified due day
+// CalculateNextDueDate calculates the next due date based on start date, due type, and due day of month
+// This function should be used for new subscriptions to determine when the first billing should occur
+func CalculateNextDueDate(dueType string, dueDayOfMonth int, startDate time.Time) time.Time {
+	currentDate := time.Now()
+	// If the due day of month is 1, then simply add a month to the current date and return the 1st of the next month
+	if dueDayOfMonth == 1 {
+		nextDueDate := currentDate.AddDate(0, 1, 0)
+		return time.Date(nextDueDate.Year(), nextDueDate.Month(), 1, 0, 0, 0, 0, nextDueDate.Location())
+	}
+
+	// If the due day of month is not 1, then we need to calculate the next due date based on the current date.
+	// If current date > due day of month, then add a month to the current date and return the due day of the next month.
+
+	if currentDate.Day() > dueDayOfMonth {
+		nextDueDate := currentDate.AddDate(0, 1, 0)
+		return time.Date(nextDueDate.Year(), nextDueDate.Month(), dueDayOfMonth, 0, 0, 0, 0, nextDueDate.Location())
+	}
+
+	// If current date < due day of month, then return the due day of the current month.
 	nextDueDate := time.Date(currentDate.Year(), currentDate.Month(), dueDayOfMonth, 0, 0, 0, 0, currentDate.Location())
-
-	// If the due day has already passed this month, move to next month
-	if nextDueDate.Before(currentDate) || nextDueDate.Equal(currentDate) {
-		if dueType == "monthly" {
-			nextDueDate = nextDueDate.AddDate(0, 1, 0)
-		} else if dueType == "yearly" {
-			nextDueDate = nextDueDate.AddDate(1, 0, 0)
-		} else if dueType == "weekly" {
-			// For weekly, find the next occurrence
-			for nextDueDate.Before(currentDate) || nextDueDate.Equal(currentDate) {
-				nextDueDate = nextDueDate.AddDate(0, 0, 7)
-			}
-		} else if dueType == "daily" {
-			// For daily, use tomorrow
-			nextDueDate = currentDate.AddDate(0, 0, 1)
-		}
-	}
-
-	// Handle edge case where the due day doesn't exist in the target month
-	// (e.g., due day is 31st but target month only has 30 days)
-	if dueType == "monthly" || dueType == "yearly" {
-		for {
-			// Try to create the date
-			testDate := time.Date(nextDueDate.Year(), nextDueDate.Month(), dueDayOfMonth, 0, 0, 0, 0, currentDate.Location())
-			if testDate.Month() == nextDueDate.Month() {
-				// Date is valid for this month
-				nextDueDate = testDate
-				break
-			} else {
-				// Date rolled over to next month, so use the last day of the target month
-				nextDueDate = time.Date(nextDueDate.Year(), nextDueDate.Month()+1, 1, 0, 0, 0, 0, currentDate.Location()).AddDate(0, 0, -1)
-				break
-			}
-		}
-	}
-
 	return nextDueDate
-}
 
-// CalculateNextDueDateForExistingRecord calculates the next due date for existing records during migration
-// It uses the start_date as reference and calculates the next occurrence based on current date
-func CalculateNextDueDateForExistingRecord(startDate time.Time, dueDayOfMonth int, dueType string, currentDate time.Time) time.Time {
-	// First, try to create a date in the current month with the specified due day
-	nextDueDate := time.Date(currentDate.Year(), currentDate.Month(), dueDayOfMonth, 0, 0, 0, 0, currentDate.Location())
-
-	// If the due day has already passed this month, move to next month
-	if nextDueDate.Before(currentDate) || nextDueDate.Equal(currentDate) {
-		if dueType == "monthly" {
-			nextDueDate = nextDueDate.AddDate(0, 1, 0)
-		} else if dueType == "yearly" {
-			nextDueDate = nextDueDate.AddDate(1, 0, 0)
-		} else if dueType == "weekly" {
-			// For weekly, find the next occurrence
-			for nextDueDate.Before(currentDate) || nextDueDate.Equal(currentDate) {
-				nextDueDate = nextDueDate.AddDate(0, 0, 7)
-			}
-		} else if dueType == "daily" {
-			// For daily, use tomorrow
-			nextDueDate = currentDate.AddDate(0, 0, 1)
-		}
-	}
-
-	// Handle edge case where the due day doesn't exist in the target month
-	if dueType == "monthly" || dueType == "yearly" {
-		for {
-			// Try to create the date
-			testDate := time.Date(nextDueDate.Year(), nextDueDate.Month(), dueDayOfMonth, 0, 0, 0, 0, currentDate.Location())
-			if testDate.Month() == nextDueDate.Month() {
-				// Date is valid for this month
-				nextDueDate = testDate
-				break
-			} else {
-				// Date rolled over to next month, so use the last day of the target month
-				nextDueDate = time.Date(nextDueDate.Year(), nextDueDate.Month()+1, 1, 0, 0, 0, 0, currentDate.Location()).AddDate(0, 0, -1)
-				break
-			}
-		}
-	}
-
-	return nextDueDate
-}
-
-// CalculateEndDate calculates the end date based on start date and due type
-func CalculateEndDate(startDate time.Time, dueType string) time.Time {
-	switch dueType {
-	case "monthly":
-		return startDate.AddDate(0, 12, 0) // 1 year from start
-	case "yearly":
-		return startDate.AddDate(5, 0, 0) // 5 years from start
-	case "weekly":
-		return startDate.AddDate(0, 3, 0) // 3 months from start
-	case "daily":
-		return startDate.AddDate(0, 1, 0) // 1 month from start
-	default:
-		return startDate.AddDate(1, 0, 0) // Default to 1 year
-	}
 }

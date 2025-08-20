@@ -8,7 +8,6 @@ import (
 	"subscritracker/pkg/models"
 	subscription_channels "subscritracker/pkg/subscription-channels"
 	"subscritracker/pkg/validator"
-	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -46,6 +45,12 @@ func PostSubscriptionDetailsHandler(c echo.Context) error {
 		MonthlyBill:           request.MonthlyBill,
 		DueType:               request.DueType,
 		DueDayOfMonth:         request.DueDayOfMonth,
+		// Initialize optional time fields to nil explicitly
+		EndDate:      nil,
+		StartTime:    nil,
+		DueTime:      nil,
+		ReminderDate: nil,
+		ReminderTime: nil,
 	}
 
 	// Handle optional time fields - only set if they exist
@@ -56,24 +61,25 @@ func PostSubscriptionDetailsHandler(c echo.Context) error {
 		subscriptionDetails.NextDueDate = *request.NextDueDate
 	}
 	if request.EndDate != nil {
-		subscriptionDetails.EndDate = *request.EndDate
+		subscriptionDetails.EndDate = request.EndDate
 	}
 	if request.StartTime != nil {
-		subscriptionDetails.StartTime = *request.StartTime
+		subscriptionDetails.StartTime = request.StartTime
 	}
 	if request.DueTime != nil {
-		subscriptionDetails.DueTime = *request.DueTime
+		subscriptionDetails.DueTime = request.DueTime
 	}
 	if request.ReminderDate != nil {
-		subscriptionDetails.ReminderDate = *request.ReminderDate
+		subscriptionDetails.ReminderDate = request.ReminderDate
 	}
 	if request.ReminderTime != nil {
-		subscriptionDetails.ReminderTime = *request.ReminderTime
+		subscriptionDetails.ReminderTime = request.ReminderTime
 	}
 
 	// Calculate NextDueDate only if it's not provided in the request
+	// Note: StartDate must be set before calling CalculateNextDueDate
 	if request.NextDueDate == nil {
-		subscriptionDetails.NextDueDate = CalculateNextDueDate(subscriptionDetails.DueType, subscriptionDetails.DueDayOfMonth, time.Now())
+		subscriptionDetails.NextDueDate = CalculateNextDueDate(subscriptionDetails.DueType, subscriptionDetails.DueDayOfMonth, subscriptionDetails.StartDate)
 	}
 
 	createdSubscriptionDetails, err := CreateSubscriptionDetails(c, subscriptionDetails)
